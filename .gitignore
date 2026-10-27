@@ -1,0 +1,7 @@
+node_modules/
+dist/
+coverage/
+.journey-budget/
+.env
+.env.*
+!.env.example
