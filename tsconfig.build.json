@@ -1,0 +1,12 @@
+{
+  // Build config: compiles only the shipped CLI into dist/ (dist/cli.js matches package.json "bin").
+  // The root tsconfig.json typechecks everything, including tests and the prototype.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist"
+  },
+  "include": ["src/**/*.ts"],
+  // The Milestone 1 prototype depends on the test fixture server, so it is not shipped.
+  "exclude": ["node_modules", "dist", "tests", "src/prototype.ts", "src/prototype/**"]
+}
