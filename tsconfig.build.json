@@ -8,5 +8,5 @@
   },
   "include": ["src/**/*.ts"],
   // The Milestone 1 prototype depends on the test fixture server, so it is not shipped.
-  "exclude": ["node_modules", "dist", "tests", "src/prototype.ts", "src/prototype/**"]
+  "exclude": ["node_modules", "dist", "tests", "src/prototype.ts", "src/prototype/experiment.ts", "src/prototype/report.ts"]
 }
