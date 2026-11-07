@@ -104,3 +104,40 @@ export function formatComparison(comp: RunComparisonResult): string {
 
     return lines.join("\n");
 }
+
+/**
+ * Formats one or more journey reports and budget evaluations as a GitHub-Flavored Markdown table
+ * for GitHub Actions Job Summaries ($GITHUB_STEP_SUMMARY).
+ */
+export function formatMarkdownSummary(
+  items: { report: JourneyRunReport; evaluation?: BudgetEvaluationResult }[],
+): string {
+  const lines: string[] = [];
+  lines.push("## 📊 Journey Budget Report\n");
+  lines.push(
+    "| Journey | Cache Mode | Transfer | Duration | Est. Cost | Budget Status |",
+  );
+  lines.push("| :--- | :--- | :--- | :--- | :--- | :--- |");
+
+  for (const { report, evaluation } of items) {
+    const transferStr = report.totals.transfer.complete
+      ? formatBytes(report.totals.transfer.bytes)
+      : `>= ${formatBytes(report.totals.transfer.bytes)} (incomplete)`;
+
+    const costStr = report.cost
+      ? `${report.cost.estimatedCost.toFixed(4)} ${report.cost.currency}`
+      : "N/A";
+    let statusStr = "ℹ️ No Budget";
+    if (report.outcome === "failed") {
+      statusStr = "❌ Run Failed";
+    } else if (evaluation) {
+      statusStr = evaluation.passed ? "✅ Passed" : "❌ Exceeded";
+    }
+
+    lines.push(
+      `| **${report.journeyName}** | \`${report.cacheMode}\` | ${transferStr} | ${report.durationMs} ms | ${costStr} | ${statusStr} |`,
+    );
+  }
+
+  return lines.join("\n") + "\n";
+}
