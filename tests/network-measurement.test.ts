@@ -138,12 +138,13 @@ describe("deriveMeasurement", () => {
     expect(m.notes.join(" ")).toMatch(/cache-storage/);
   });
 
-  it("does not estimate request headers for HTTP/2 (partial measurement)", () => {
+  it("reconstructs request headers for HTTP/2 with an explanatory note", () => {
     const m = deriveMeasurement(observed({ protocol: "h2" }));
-    expect(m.requestHeaderBytes).toBeNull();
-    expect(m.transferBytes).toBeNull();
+    expect(m.requestHeaderBytes).toBeGreaterThan(0);
+    expect(m.transferBytes).toBe(10_873 + m.requestHeaderBytes!);
     expect(m.receivedBytes).toBe(10_873);
-    expect(m.status).toBe("partial");
+    expect(m.status).toBe("measured");
+    expect(m.notes.join(" ")).toMatch(/h2/);
   });
 
   it("keeps an unknown request body size as null", () => {
@@ -152,10 +153,13 @@ describe("deriveMeasurement", () => {
     expect(m.transferBytes).toBeNull();
   });
 
-  it("reports failed and in-flight requests separately with no byte values", () => {
-    const failed = deriveMeasurement(observed({ completion: "failed", failureText: "net::ERR_ABORTED", canceled: true }));
+  it("reports failed and in-flight requests separately with no byte values, while measuring streaming responses", () => {
+    const failed = deriveMeasurement(observed({ completion: "failed", pageStatus: null, failureText: "net::ERR_FAILED", canceled: false }));
     expect(failed).toMatchObject({ status: "failed", transferBytes: null, receivedBytes: null });
-    const inFlight = deriveMeasurement(observed({ completion: "in-flight" }));
-    expect(inFlight).toMatchObject({ status: "in-flight", transferBytes: null });
+    const inFlightPending = deriveMeasurement(observed({ completion: "in-flight", pageStatus: null, raw: { decodedBodyBytes: null } }));
+    expect(inFlightPending).toMatchObject({ status: "in-flight", transferBytes: null });
+    const inFlightStream = deriveMeasurement(observed({ completion: "in-flight", pageStatus: 200 }));
+    expect(inFlightStream.status).toBe("measured");
+    expect(inFlightStream.transferBytes).toBeGreaterThan(0);
   });
 });

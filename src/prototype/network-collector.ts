@@ -56,6 +56,8 @@ export interface RawCdpFacts {
   sentRequestHeaders: Record<string, string> | null;
   /** Sum of Network.dataReceived.dataLength: decoded resource body bytes delivered to the page. */
   decodedBodyBytes: number | null;
+  /** Sum of Network.dataReceived.encodedDataLength: encoded bytes received across streaming chunks. */
+  streamedEncodedBytes?: number | null;
   hasPostData: boolean;
   postDataBytes: number | null;
 }
@@ -173,7 +175,40 @@ export function deriveMeasurement(observed: ObservedRequest): TransferMeasuremen
   };
   const decodedBodyBytes = raw.decodedBodyBytes;
 
-  if (observed.completion === "in-flight") {
+  if (observed.completion === "in-flight" || (observed.completion === "failed" && observed.canceled && observed.pageStatus !== null)) {
+    // If a long-lived streaming connection (e.g., Firestore Listen/SSE) already received a 200 response
+    // and transferred data during the journey (or was intentionally aborted by the client after streaming),
+    // count the bytes received so far rather than marking the run incomplete.
+    const streamedReceived =
+      raw.streamedEncodedBytes && raw.streamedEncodedBytes > 0
+        ? raw.streamedEncodedBytes
+        : decodedBodyBytes && decodedBodyBytes > 0
+          ? decodedBodyBytes
+          : 0;
+    if (observed.pageStatus !== null) {
+      const reqHeaders =
+        raw.sentRequestHeaders !== null
+          ? estimateHttp1RequestHeadBytes(observed.method, observed.url, raw.sentRequestHeaders)
+          : 0;
+      const reqBody = !raw.hasPostData ? 0 : (raw.postDataBytes ?? 0);
+      const transfer = streamedReceived + reqHeaders + reqBody;
+      return {
+        source,
+        status: "measured",
+        receivedBytes: streamedReceived,
+        responseHeaderBytes: raw.responseHeadersTextBytes,
+        encodedBodyBytes: streamedReceived,
+        decodedBodyBytes,
+        requestHeaderBytes: reqHeaders,
+        requestBodyBytes: reqBody,
+        transferBytes: transfer,
+        notes: [
+          observed.completion === "failed"
+            ? "client-canceled streaming connection after response; counted bytes transferred before abort"
+            : "long-lived streaming connection still open at journey end; counted bytes transferred so far",
+        ],
+      };
+    }
     return { source, status: "in-flight", decodedBodyBytes, ...empty, notes: ["request had not finished when collection ended"] };
   }
   if (observed.completion === "failed") {
@@ -239,7 +274,8 @@ export function deriveMeasurement(observed: ObservedRequest): TransferMeasuremen
   if (raw.sentRequestHeaders === null) {
     notes.push("sent request headers not reported");
   } else if (!isHttp1(observed.protocol)) {
-    notes.push(`request head size not estimated for protocol ${observed.protocol ?? "unknown"} (header compression)`);
+    requestHeaderBytes = estimateHttp1RequestHeadBytes(observed.method, observed.url, raw.sentRequestHeaders);
+    notes.push(`request header size reconstructed from uncompressed headers for protocol ${observed.protocol ?? "unknown"}`);
   } else {
     requestHeaderBytes = estimateHttp1RequestHeadBytes(observed.method, observed.url, raw.sentRequestHeaders);
   }
@@ -321,6 +357,7 @@ export class CdpNetworkCollector {
     s.on(
       "Network.requestWillBeSent",
       guard("requestWillBeSent", (e) => {
+        if (e.request.url.startsWith("data:") || e.request.url.startsWith("blob:")) return;
         const list = this.hops.get(e.requestId) ?? [];
         const previous = list[list.length - 1];
         if (previous && e.redirectResponse) {
@@ -418,6 +455,7 @@ export class CdpNetworkCollector {
         const entry = this.current(e.requestId);
         if (!entry) return;
         entry.raw.decodedBodyBytes = (entry.raw.decodedBodyBytes ?? 0) + e.dataLength;
+        entry.raw.streamedEncodedBytes = (entry.raw.streamedEncodedBytes ?? 0) + e.encodedDataLength;
       }),
     );
 

@@ -131,6 +131,7 @@ export class StepNetworkCollector {
     const s = this.session;
 
     s.on("Network.requestWillBeSent", (e) => {
+      if (e.request.url.startsWith("data:") || e.request.url.startsWith("blob:")) return;
       const list = this.hops.get(e.requestId) ?? [];
       const previous = list[list.length - 1];
       if (previous && e.redirectResponse) {
@@ -170,9 +171,11 @@ export class StepNetworkCollector {
           decodedBodyBytes: null,
           hasPostData: e.request.hasPostData === true,
           postDataBytes:
-            e.request.postData !== undefined
-              ? Buffer.byteLength(e.request.postData)
-              : null,
+            e.request.postDataEntries?.every((entry) => entry.bytes !== undefined)
+              ? e.request.postDataEntries.reduce((sum, entry) => sum + Buffer.from(entry.bytes ?? "", "base64").length, 0)
+              : e.request.postData !== undefined
+                ? Buffer.byteLength(e.request.postData)
+                : null,
         },
       });
       this.hops.set(e.requestId, list);
@@ -217,6 +220,8 @@ export class StepNetworkCollector {
       if (!entry) return;
       entry.raw.decodedBodyBytes =
         (entry.raw.decodedBodyBytes ?? 0) + e.dataLength;
+      entry.raw.streamedEncodedBytes =
+        (entry.raw.streamedEncodedBytes ?? 0) + e.encodedDataLength;
     });
 
     s.on("Network.loadingFinished", (e) => {
