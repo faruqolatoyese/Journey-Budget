@@ -51,6 +51,41 @@ const STARTER_CONFIG: ProjectConfig = {
     },
 };
 
+const STARTER_CI_WORKFLOW = `name: Journey Budget CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  journey-budget:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Start app and run Journey Budget Check
+        run: |
+          npm run build
+          npm start &
+          npx wait-on http://localhost:3000 -t 30000
+          npx journey-budget check
+`;
+
 export function createCli(): Command {
     const program = new Command();
 
@@ -62,17 +97,34 @@ export function createCli(): Command {
     // 1. journey-budget init
     program
         .command("init")
-        .description("Create a starter journey-budget.config.json file")
+        .description("Create a starter journey-budget.config.json file (and optional GitHub Actions workflow)")
         .option("-c, --config <path>", "Path to config file", DEFAULT_CONFIG_FILE)
-        .action((options: { config: string }) => {
+        .option("--ci", "Also generate a starter .github/workflows/journey-budget.yml file")
+        .action((options: { config: string; ci?: boolean }) => {
             const targetPath = path.resolve(options.config);
-            if (fs.existsSync(targetPath)) {
+            if (!fs.existsSync(targetPath)) {
+                fs.writeFileSync(targetPath, JSON.stringify(STARTER_CONFIG, null, 2), "utf-8");
+                console.log(`Created starter configuration at: ${targetPath}`);
+            } else if (!options.ci) {
                 console.error(`Configuration file already exists at: ${targetPath}`);
                 process.exitCode = 2;
                 return;
+            } else {
+                console.log(`Configuration file already exists at: ${targetPath} (skipped)`);
             }
-            fs.writeFileSync(targetPath, JSON.stringify(STARTER_CONFIG, null, 2), "utf-8");
-            console.log(`Created starter configuration at: ${targetPath}`);
+
+            if (options.ci) {
+                const workflowDir = path.join(path.dirname(targetPath), ".github", "workflows");
+                const workflowPath = path.join(workflowDir, "journey-budget.yml");
+                if (fs.existsSync(workflowPath)) {
+                    console.error(`GitHub Actions workflow already exists at: ${workflowPath}`);
+                    process.exitCode = 2;
+                    return;
+                }
+                fs.mkdirSync(workflowDir, { recursive: true });
+                fs.writeFileSync(workflowPath, STARTER_CI_WORKFLOW, "utf-8");
+                console.log(`Created GitHub Actions workflow at: ${workflowPath}`);
+            }
         });
 
     // 2. journey-budget run

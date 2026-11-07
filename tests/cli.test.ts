@@ -45,4 +45,22 @@ describe("Formatter & CLI Commands (Phase 5)", () => {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
   });
+
+  it("creates both config and GitHub Actions workflow when running `journey-budget init --ci`", async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "jb-cli-ci-"));
+    const configPath = path.join(tmpDir, "journey-budget.config.json");
+    const workflowPath = path.join(tmpDir, ".github", "workflows", "journey-budget.yml");
+
+    try {
+      const cli = createCli();
+      await cli.parseAsync(["node", "journey-budget", "init", "--ci", "-c", configPath]);
+
+      expect(fs.existsSync(configPath)).toBe(true);
+      expect(fs.existsSync(workflowPath)).toBe(true);
+      const workflowContent = fs.readFileSync(workflowPath, "utf-8");
+      expect(workflowContent).toContain("npx journey-budget check");
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
 });
