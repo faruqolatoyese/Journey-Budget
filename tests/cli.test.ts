@@ -29,9 +29,10 @@ describe("Formatter & CLI Commands (Phase 5)", () => {
     expect(formatBudgetResult(failResult)).toContain("Too big");
   });
 
-  it("creates a valid starter config file when running `journey-budget init`", async () => {
+  it("creates a valid starter config file and updates .gitignore when running `journey-budget init`", async () => {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "jb-cli-"));
     const configPath = path.join(tmpDir, "journey-budget.config.json");
+    const gitignorePath = path.join(tmpDir, ".gitignore");
 
     try {
       const cli = createCli();
@@ -41,6 +42,9 @@ describe("Formatter & CLI Commands (Phase 5)", () => {
       const created = JSON.parse(fs.readFileSync(configPath, "utf-8"));
       expect(created.baseUrl).toBe("http://localhost:3000");
       expect(created.journeys[0].name).toBe("search");
+
+      expect(fs.existsSync(gitignorePath)).toBe(true);
+      expect(fs.readFileSync(gitignorePath, "utf-8")).toContain(".journey-budget/runs/");
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }

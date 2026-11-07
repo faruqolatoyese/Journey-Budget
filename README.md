@@ -1,6 +1,6 @@
 # 📊 Journey Budget (`journey-budget`)
 
-**Data-Cost Budget for User Journeys** — A local-first TypeScript/Node.js CLI and CI/CD automation tool that measures browser-observed network transfer, elapsed duration, cache efficiency, and estimated mobile data cost across multi-step web user journeys.
+**Data-Cost Budget for User Journeys** A local-first TypeScript/Node.js CLI and CI/CD automation tool that measures browser-observed network transfer, elapsed duration, cache efficiency, and estimated mobile data cost across multi-step web user journeys.
 
 ---
 
@@ -8,9 +8,9 @@
 
 Developers often inspect a single page load in browser DevTools, but real users complete **multi-step journeys**: signing in, searching for a product, submitting a form, loading dashboard data, or completing checkout.
 
-A single code change—such as a heavier JavaScript chunk, missing `gzip`/`brotli` compression, unoptimized images, duplicate API fetches, or broken `Cache-Control` headers—can silently multiply the network data required to complete a user flow. This is especially critical for users on metered or expensive mobile data plans.
+A single code change such as a heavier JavaScript chunk, missing `gzip`/`brotli` compression, unoptimized images, duplicate API fetches, or broken `Cache-Control` headers can silently multiply the network data required to complete a user flow. This is especially critical for users on metered or expensive mobile data plans.
 
-`journey-budget` helps engineering teams answer five practical questions automatically—locally and on every GitHub Pull Request:
+`journey-budget` helps engineering teams answer five practical questions automatically locally and on every GitHub Pull Request:
 1. **How much network data did this user journey transfer (upload + download)?**
 2. **How long did the journey take under controlled test conditions?**
 3. **Which journey step and resource types (`Script`, `Stylesheet`, `Font`, `Image`, `Fetch`) contributed most to the total?**
@@ -111,7 +111,7 @@ Privacy-Redacted Local Storage (.journey-budget/) + Terminal & GitHub PR Summary
 ```
 
 ### 1. Why Chrome DevTools Protocol (CDP) Instead of Playwright's `request.sizes()`?
-Standard Playwright `request.sizes()` computes `responseBodySize = encodedDataLength - responseHeadersSize`. On HTTP cache hits (`encodedDataLength = 0`), Playwright subtracts cached header sizes from zero—producing **negative body sizes** (e.g., `-216 B`) and hiding `304 Not Modified` wire revalidations behind `200 OK` page statuses.
+Standard Playwright `request.sizes()` computes `responseBodySize = encodedDataLength - responseHeadersSize`. On HTTP cache hits (`encodedDataLength = 0`), Playwright subtracts cached header sizes from zero producing **negative body sizes** (e.g., `-216 B`) and hiding `304 Not Modified` wire revalidations behind `200 OK` page statuses.
 
 `journey-budget` attaches a dedicated CDP session (`context.newCDPSession(page)`) and listens directly to `Network.*` events without enabling request interception (`page.route()`), preserving native browser HTTP caching:
 * **`receivedBytes`**: Measured from `Network.loadingFinished.encodedDataLength` (exact response status line + headers + compressed body received over the wire).
@@ -124,7 +124,7 @@ Standard Playwright `request.sizes()` computes `responseBodySize = encodedDataLe
 As the runner executes each configured step (`navigate`, `fill`, `click`, `wait-for`), it updates the active step on `StepNetworkCollector`.
 * Every request records both `startedAtStep` and `completedAtStep`.
 * Bytes are attributed to `startedAtStep`, while requests that remain in-flight across step boundaries are counted in `crossBoundaryRequestCount`.
-* Journey totals are computed directly from underlying observations—ensuring step totals and resource-type totals sum to 100% of the journey total without double-counting.
+* Journey totals are computed directly from underlying observations ensuring step totals and resource-type totals sum to 100% of the journey total without double-counting.
 
 ### 3. Cold Cache vs. Warm Cache Scenarios
 * **`"cold"`**: Runs the journey in a fresh `BrowserContext` with an empty HTTP cache (measuring a first-time visit).

@@ -1,7 +1,6 @@
 node_modules/
 dist/
 coverage/
-.journey-budget/
-.env
-.env.*
-!.env.example
+.journey-budget/runs/
+*.log
+.DS_Store

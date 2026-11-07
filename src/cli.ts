@@ -86,6 +86,30 @@ jobs:
           npx journey-budget check
 `;
 
+function ensureGitignoreEntry(projectDir: string): void {
+    const gitignorePath = path.join(projectDir, ".gitignore");
+    const entry = ".journey-budget/runs/";
+    if (fs.existsSync(gitignorePath)) {
+        const content = fs.readFileSync(gitignorePath, "utf-8");
+        if (!content.includes(entry) && !content.includes(".journey-budget/")) {
+            const prefix = content.length > 0 && !content.endsWith("\n") ? "\n" : "";
+            fs.appendFileSync(
+                gitignorePath,
+                `${prefix}\n# Journey Budget temporary run reports\n${entry}\n`,
+                "utf-8",
+            );
+            console.log(`Added "${entry}" to: ${gitignorePath}`);
+        }
+    } else {
+        fs.writeFileSync(
+            gitignorePath,
+            `# Journey Budget temporary run reports\n${entry}\n`,
+            "utf-8",
+        );
+        console.log(`Created .gitignore with "${entry}" at: ${gitignorePath}`);
+    }
+}
+
 export function createCli(): Command {
     const program = new Command();
 
@@ -102,6 +126,8 @@ export function createCli(): Command {
         .option("--ci", "Also generate a starter .github/workflows/journey-budget.yml file")
         .action((options: { config: string; ci?: boolean }) => {
             const targetPath = path.resolve(options.config);
+            const projectDir = path.dirname(targetPath);
+
             if (!fs.existsSync(targetPath)) {
                 fs.writeFileSync(targetPath, JSON.stringify(STARTER_CONFIG, null, 2), "utf-8");
                 console.log(`Created starter configuration at: ${targetPath}`);
@@ -113,8 +139,10 @@ export function createCli(): Command {
                 console.log(`Configuration file already exists at: ${targetPath} (skipped)`);
             }
 
+            ensureGitignoreEntry(projectDir);
+
             if (options.ci) {
-                const workflowDir = path.join(path.dirname(targetPath), ".github", "workflows");
+                const workflowDir = path.join(projectDir, ".github", "workflows");
                 const workflowPath = path.join(workflowDir, "journey-budget.yml");
                 if (fs.existsSync(workflowPath)) {
                     console.error(`GitHub Actions workflow already exists at: ${workflowPath}`);
